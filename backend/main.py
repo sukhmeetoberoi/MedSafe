@@ -12,9 +12,13 @@ import os
 from core.config import settings
 from api.routes import upload, process, summarize, health
 from core.logging import setup_logging
+from database.database import init_db
 
 # Setup logging
 setup_logging()
+
+# Initialize database tables
+init_db()
 
 app = FastAPI(
     title="MedSummarize API",
