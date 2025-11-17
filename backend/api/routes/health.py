@@ -4,6 +4,7 @@ Health check endpoints
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database.database import get_db
 from core.logging import logger
 import time
