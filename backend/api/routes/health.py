@@ -32,7 +32,7 @@ async def detailed_health_check(db: Session = Depends(get_db)):
 
     # Check database connection
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         health_status["dependencies"]["database"] = "healthy"
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
