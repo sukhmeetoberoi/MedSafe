@@ -23,6 +23,7 @@ function App() {
         <TechStack />
         <WhyChoose />
         <Demo />
+        <InteractiveDemo />
         <Contact />
       </main>
       <Footer />
