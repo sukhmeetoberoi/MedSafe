@@ -181,7 +181,10 @@ const HowItWorks = () => {
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ duration: 0.6 }}
                 >
-                  <steps[activeStep].icon className="w-16 h-16" />
+                  {(() => {
+                    const IconComponent = steps[activeStep].icon;
+                    return <IconComponent className="w-16 h-16" />;
+                  })()}
                 </motion.div>
                 <h3 className="text-3xl font-bold text-dark-blue-gray mb-4">
                   {steps[activeStep].title}
