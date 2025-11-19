@@ -21,7 +21,6 @@ function App() {
         <HowItWorks />
         <TechStack />
         <WhyChoose />
-        <Demo />
         <InteractiveDemo />
         <Contact />
       </main>
