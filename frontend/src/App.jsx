@@ -6,7 +6,6 @@ import Features from './components/sections/Features';
 import HowItWorks from './components/sections/HowItWorks';
 import TechStack from './components/sections/TechStack';
 import WhyChoose from './components/sections/WhyChoose';
-import Demo from './components/sections/Demo';
 import InteractiveDemo from './components/sections/InteractiveDemo';
 import Contact from './components/sections/Contact';
 import Footer from './components/layout/Footer';
