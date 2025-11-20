@@ -383,7 +383,7 @@ const InteractiveDemo = () => {
                         </div>
                       </div>
                       <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
-                        {currentSummary.content}
+                        {currentSummary.content || currentSummary.summary || JSON.stringify(currentSummary, null, 2)}
                       </div>
                     </>
                   ) : (
