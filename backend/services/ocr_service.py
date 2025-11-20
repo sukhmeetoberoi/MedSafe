@@ -125,7 +125,7 @@ class OCRService:
             processed_image = self._preprocess_image(image)
 
             # Configure Tesseract for medical documents
-            custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:!?()[]{}"\'+-/=%&@#$*<>\n\s'
+            custom_config = r'--oem 3 --psm 6'
 
             # Extract text
             text = pytesseract.image_to_string(
