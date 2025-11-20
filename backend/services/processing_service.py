@@ -189,12 +189,17 @@ class ProcessingService:
 
                 logger.info(f"Generating {summary_type} summary for report {report.id}")
 
-                # Generate summary using LLM service
-                summary_result = await llm_service.generate_summary(
-                    report.phi_redacted_text,
-                    summary_type,
-                    llm_provider
-                )
+                # Generate summary using LLM service with fallback
+                try:
+                    summary_result = await llm_service.generate_summary(
+                        report.phi_redacted_text,
+                        summary_type,
+                        llm_provider
+                    )
+                except Exception as llm_error:
+                    logger.warning(f"LLM service failed for report {report.id}, using fallback: {llm_error}")
+                    # Fallback: Create basic summary from extracted text
+                    summary_result = self._create_fallback_summary(report.phi_redacted_text, summary_type)
 
                 # Create summary record
                 summary = Summary(
