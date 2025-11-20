@@ -131,6 +131,12 @@ const InteractiveDemo = () => {
 
   const currentSummary = getCurrentSummary();
 
+  // Debug logging
+  console.log('Current report:', currentReport);
+  console.log('Status:', status);
+  console.log('Summaries:', summaries);
+  console.log('Current summary:', currentSummary);
+
   return (
     <section id="demo" className="py-20 bg-white">
       <div className="container mx-auto px-4">
