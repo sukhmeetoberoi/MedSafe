@@ -44,14 +44,24 @@ const InteractiveDemo = () => {
 
   const handleFileUpload = async (file) => {
     try {
+      console.log('Starting file upload for:', file.name);
       const uploadResult = await uploadFile(file);
+      console.log('Upload result:', uploadResult);
+
       if (uploadResult.success) {
+        console.log('Upload successful, starting processing for report:', uploadResult.report_id);
+
         // Start processing automatically
-        await processReport(uploadResult.report_id, {
-          includeSummaries: true,
-          summaryTypes: 'clinician,patient',
-          llmProvider: 'auto'
-        });
+        try {
+          const processResult = await processReport(uploadResult.report_id, {
+            includeSummaries: true,
+            summaryTypes: 'clinician,patient',
+            llmProvider: 'auto'
+          });
+          console.log('Processing started:', processResult);
+        } catch (processError) {
+          console.error('Processing error:', processError);
+        }
 
         setCurrentReport({
           id: uploadResult.report_id,
@@ -60,6 +70,8 @@ const InteractiveDemo = () => {
         });
 
         setShowResults(true);
+      } else {
+        console.error('Upload failed:', uploadResult);
       }
     } catch (error) {
       console.error('Upload error:', error);
