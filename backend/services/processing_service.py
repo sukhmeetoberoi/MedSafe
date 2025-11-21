@@ -454,8 +454,8 @@ class ProcessingService:
 
         return {
             "summary": summary,
-            "provider": "ocr_nlp_processor",
-            "model": "medical_extractor_v2",
+            "provider": "basic",  # Match SummaryProvider.BASIC enum
+            "model": "OCR_NLP_Processor_v2",
             "confidence": 0.85,
             "processing_time": 0.5,
             "usage": {}
