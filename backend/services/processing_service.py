@@ -211,7 +211,7 @@ class ProcessingService:
                     confidence_score=summary_result.get("confidence", 0.85),
                     processing_time=summary_result.get("processing_time", 0.5),
                     tokens_used=summary_result.get("usage", {}),
-                    title=f"Medical Report {summary_type.title()} Summary (OCR+NL"
+                    title=f"Medical Report {summary_type.title()} Summary (OCR+NLP)"
                 )
 
                 db.add(summary)
