@@ -205,13 +205,13 @@ class ProcessingService:
                 summary = Summary(
                     report_id=report.id,
                     summary_type=SummaryType(summary_type),
-                    provider=SummaryProvider("ocr_nlp"),  # Mark as real OCR/NLP processing
-                    model_name=summary_result.get("model", "ocr_nlp_processor"),
+                    provider=SummaryProvider.BASIC,  # Use BASIC for OCR/NLP processing
+                    model_name=summary_result.get("model", "OCR_NLP_Processor_v2"),
                     content=summary_result.get("summary", ""),
                     confidence_score=summary_result.get("confidence", 0.85),
                     processing_time=summary_result.get("processing_time", 0.5),
                     tokens_used=summary_result.get("usage", {}),
-                    title=f"OCR-NLP {summary_type.title()} Summary"
+                    title=f"Medical Report {summary_type.title()} Summary (OCR+NL"
                 )
 
                 db.add(summary)
