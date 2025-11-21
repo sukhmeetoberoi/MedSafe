@@ -434,8 +434,8 @@ class ProcessingService:
         if not text or not text.strip():
             return {
                 "summary": "No text content extracted from the document. The document may be an image-only file or corrupted.",
-                "provider": "ocr_nlp",
-                "model": "extractor_v1",
+                "provider": "basic",
+                "model": "OCR_NLP_Processor_v1",
                 "confidence": 0.3,
                 "processing_time": 0.1,
                 "usage": {}
