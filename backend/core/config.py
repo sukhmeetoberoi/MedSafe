@@ -32,16 +32,21 @@ class Settings(BaseSettings):
     PINECONE_ENVIRONMENT: str = "us-west1-gcp"
     PINECONE_INDEX_NAME: str = "medsummarize"
 
-    # AI/ML APIs / Keys (add keys you use)
+    # AI/ML APIs
     OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
     GEMINI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_VISION_API_KEY: Optional[str] = None
 
+    # ✅ REQUIRED FIELD (Fixes your error)
+    GEMINI_MODEL: str = "models/gemini-flash-latest"
+
+
     # File Storage
     UPLOAD_DIR: str = "uploads"
-    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50 MB (adjust to your needs)
-    # Use leading dots to match os.path.splitext(...) results ('.pdf', '.jpg', ...)
+    MAX_FILE_SIZE: int = 50 * 1024 * 1024  # 50 MB
     ALLOWED_FILE_TYPES: List[str] = [".pdf", ".jpg", ".jpeg", ".png", ".tiff"]
 
     # AWS S3
@@ -56,7 +61,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # OCR Settings
-    TESSERACT_CMD: Optional[str] = None  # Path to Tesseract executable if not in PATH
+    TESSERACT_CMD: Optional[str] = None
 
     # spaCy Model
     SPACY_MODEL: str = "en_core_web_sm"
@@ -68,13 +73,12 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
-        # If you prefer pydantic to reject unknown env vars uncomment below:
-        # model_config = {"extra": "forbid"}
+
 
 # Global settings instance
 settings = Settings()
 
-# Create necessary directories (safe to run at import)
+# Create necessary directories
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 os.makedirs("static", exist_ok=True)

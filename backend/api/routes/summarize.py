@@ -3,46 +3,110 @@ Summarization API endpoints
 Handles AI-powered medical report summarization
 """
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
-from core.config import settings
 from core.logging import logger
 from database.database import get_db
 from models.report import Report, ProcessingStatus
-from models.summary import Summary
+from models.summary import Summary, SummaryType
 from services.llm_service import llm_service
 
 router = APIRouter()
 
+
 @router.get("/report/{report_id}")
-async def get_report_summaries(
+def get_latest_report_summary(
     report_id: int,
-    summary_type: Optional[str] = Query(None, description="Filter by summary type"),
-    db: Session = Depends(get_db)
+    summary_type: str = Query("clinician"),  # "clinician" or "patient"
+    db: Session = Depends(get_db),
 ):
     """
-    Get all summaries for a report
+    Get the latest summary for a report, optionally filtered by type.
 
-    Args:
-        report_id: Report ID
-        summary_type: Optional filter for summary type
-        db: Database session
+    Returns (when summary exists):
+        {
+          "success": true,
+          "report_id": ...,
+          "summary": { ...Summary.to_dict()... }
+        }
+
+    Returns (when summary not ready yet):
+        {
+          "success": false,
+          "report_id": ...,
+          "summary": null,
+          "status": "...",
+          "message": "Summary not generated yet"
+        }
+    """
+    # 1) Check report exists
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # 2) Validate summary_type
+    if summary_type not in [s.value for s in SummaryType]:
+        raise HTTPException(status_code=400, detail="Invalid summary_type")
+
+    # 3) Get latest summary of that type
+    summary = (
+        db.query(Summary)
+        .filter(
+            Summary.report_id == report_id,
+            Summary.summary_type == summary_type,
+        )
+        .order_by(Summary.created_at.desc())
+        .first()
+    )
+
+    if not summary:
+        # 🔹 IMPORTANT: return 200 (success: false) instead of 404
+        # so frontend doesn't treat it as a hard error.
+        return {
+            "success": False,
+            "report_id": report_id,
+            "summary": None,
+            "status": report.status,
+            "message": "Summary not generated yet",
+        }
+
+    return {
+        "success": True,
+        "report_id": report_id,
+        "summary": summary.to_dict(),
+    }
+
+
+@router.get("/report/{report_id}/all")
+def get_all_summaries_for_report(
+    report_id: int,
+    summary_type: Optional[str] = Query(None),  # optional filter
+    db: Session = Depends(get_db),
+):
+    """
+    Get all summaries for a report.
 
     Returns:
-        List of summaries
+        {
+          "success": true,
+          "report_id": ...,
+          "total_summaries": N,
+          "summaries": [ {..}, {..}, ... ]
+        }
     """
     try:
-        # Check if report exists
         report = db.query(Report).filter(Report.id == report_id).first()
         if not report:
             raise HTTPException(status_code=404, detail="Report not found")
 
-        # Query summaries
         query = db.query(Summary).filter(Summary.report_id == report_id)
 
         if summary_type:
+            if summary_type not in [s.value for s in SummaryType]:
+                raise HTTPException(status_code=400, detail="Invalid summary_type")
             query = query.filter(Summary.summary_type == summary_type)
 
         summaries = query.order_by(Summary.created_at.desc()).all()
@@ -51,7 +115,7 @@ async def get_report_summaries(
             "success": True,
             "report_id": report_id,
             "total_summaries": len(summaries),
-            "summaries": [summary.to_dict() for summary in summaries]
+            "summaries": [s.to_dict() for s in summaries],
         }
 
     except HTTPException:
@@ -60,18 +124,10 @@ async def get_report_summaries(
         logger.error(f"Error getting summaries for report {report_id}: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving summaries")
 
+
 @router.get("/{summary_id}")
 async def get_summary(summary_id: int, db: Session = Depends(get_db)):
-    """
-    Get a specific summary by ID
-
-    Args:
-        summary_id: Summary ID
-        db: Database session
-
-    Returns:
-        Summary details
-    """
+    """Get a specific summary by ID."""
     try:
         summary = db.query(Summary).filter(Summary.id == summary_id).first()
         if not summary:
@@ -79,7 +135,7 @@ async def get_summary(summary_id: int, db: Session = Depends(get_db)):
 
         return {
             "success": True,
-            "summary": summary.to_dict()
+            "summary": summary.to_dict(),
         }
 
     except HTTPException:
@@ -88,154 +144,53 @@ async def get_summary(summary_id: int, db: Session = Depends(get_db)):
         logger.error(f"Error getting summary {summary_id}: {e}")
         raise HTTPException(status_code=500, detail="Error retrieving summary")
 
-@router.post("/{summary_id}/feedback")
-async def submit_summary_feedback(
-    summary_id: int,
-    rating: int,
-    feedback: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Submit feedback for a summary
-
-    Args:
-        summary_id: Summary ID
-        rating: User rating (1-5)
-        feedback: Optional feedback text
-        db: Database session
-
-    Returns:
-        Feedback submission response
-    """
-    try:
-        # Validate rating
-        if not 1 <= rating <= 5:
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
-
-        summary = db.query(Summary).filter(Summary.id == summary_id).first()
-        if not summary:
-            raise HTTPException(status_code=404, detail="Summary not found")
-
-        # Update summary with feedback
-        summary.user_rating = rating
-        summary.user_feedback = feedback
-        db.commit()
-
-        logger.info(f"Feedback submitted for summary {summary_id}: rating={rating}")
-
-        return {
-            "success": True,
-            "message": "Feedback submitted successfully",
-            "summary_id": summary_id,
-            "rating": rating
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting feedback for summary {summary_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error submitting feedback")
-
-@router.post("/{summary_id}/bookmark")
-async def toggle_bookmark(summary_id: int, db: Session = Depends(get_db)):
-    """
-    Toggle bookmark status for a summary
-
-    Args:
-        summary_id: Summary ID
-        db: Database session
-
-    Returns:
-        Updated bookmark status
-    """
-    try:
-        summary = db.query(Summary).filter(Summary.id == summary_id).first()
-        if not summary:
-            raise HTTPException(status_code=404, detail="Summary not found")
-
-        # Toggle bookmark status
-        summary.is_bookmarked = not summary.is_bookmarked
-        db.commit()
-
-        logger.info(f"Bookmark toggled for summary {summary_id}: {summary.is_bookmarked}")
-
-        return {
-            "success": True,
-            "summary_id": summary_id,
-            "is_bookmarked": summary.is_bookmarked,
-            "message": f"Summary {'bookmarked' if summary.is_bookmarked else 'unbookmarked'} successfully"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error toggling bookmark for summary {summary_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error toggling bookmark")
 
 @router.get("/report/{report_id}/compare")
 async def compare_summaries(report_id: int, db: Session = Depends(get_db)):
     """
-    Compare different summary types for a report
-
-    Args:
-        report_id: Report ID
-        db: Database session
-
-    Returns:
-        Summary comparison
+    Compare clinician vs patient summaries for a report.
+    Used by the Demo tab.
     """
     try:
-        # Check if report exists and is processed
         report = db.query(Report).filter(Report.id == report_id).first()
         if not report:
             raise HTTPException(status_code=404, detail="Report not found")
 
         if report.status != ProcessingStatus.COMPLETED:
-            raise HTTPException(status_code=400, detail="Report processing must be completed")
+            raise HTTPException(
+                status_code=400, detail="Report processing must be completed"
+            )
 
-        # Get summaries for comparison
         summaries = db.query(Summary).filter(Summary.report_id == report_id).all()
 
-        if len(summaries) < 2:
-            raise HTTPException(status_code=400, detail="Need at least 2 summaries for comparison")
-
-        # Separate summaries by type
         clinician_summary = None
         patient_summary = None
 
         for summary in summaries:
-            if summary.summary_type == "clinician":
+            if summary.summary_type == SummaryType.CLINICIAN.value:
                 clinician_summary = summary
-            elif summary.summary_type == "patient":
+            elif summary.summary_type == SummaryType.PATIENT.value:
                 patient_summary = summary
 
         if not clinician_summary or not patient_summary:
-            raise HTTPException(status_code=400, detail="Both clinician and patient summaries required for comparison")
+            raise HTTPException(
+                status_code=400,
+                detail="Need clinician and patient summaries for comparison",
+            )
 
-        # Generate comparison analysis
         comparison = await llm_service.compare_summaries(
-            report.phi_redacted_text,
+            report.phi_redacted_text or report.extracted_text or "",
             clinician_summary.content,
-            patient_summary.content
+            patient_summary.content,
         )
 
         return {
             "success": True,
             "report_id": report_id,
-            "clinician_summary": {
-                "id": clinician_summary.id,
-                "content": clinician_summary.content,
-                "confidence": clinician_summary.confidence_score,
-                "provider": clinician_summary.provider
-            },
-            "patient_summary": {
-                "id": patient_summary.id,
-                "content": patient_summary.content,
-                "confidence": patient_summary.confidence_score,
-                "provider": patient_summary.provider
-            },
+            "clinician_summary": clinician_summary.to_dict(),
+            "patient_summary": patient_summary.to_dict(),
             "comparison_analysis": comparison.get("comparison_analysis", {}),
-            "recommendations": comparison.get("recommendations", [])
+            "recommendations": comparison.get("recommendations", []),
         }
 
     except HTTPException:

@@ -1,219 +1,292 @@
 """
-LLM Service for generating medical report summaries
+LLM Service (Final Fixed Version)
+Gemini primary, fallback summarizer secondary.
 """
 
 import asyncio
+import json
 from typing import Dict, Any, Optional
 
 from core.config import settings
 from core.logging import logger
+from models.summary import SummaryProvider
 
+# Try loading Gemini
 try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
+    genai = None
+    GEMINI_AVAILABLE = False
 
 
 class LLMService:
     def __init__(self):
-        self.client = None
-        self.model = "gpt-4o-mini"  # change to whatever you have access to
-        self._setup_clients()
+        self.gemini_api_key = settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY
+        self.model_name = settings.GEMINI_MODEL
+        self.model = None
 
-    def _setup_clients(self):
-        """Initialize OpenAI or fallback."""
-        if not settings.OPENAI_API_KEY:
-            logger.warning("OPENAI_API_KEY not set. Falling back to basic summaries.")
+        self.active_provider = SummaryProvider.BASIC
+        self._setup_gemini()
+
+    def _setup_gemini(self):
+        """Initialize Gemini model correctly"""
+        if not self.gemini_api_key:
+            logger.warning("Gemini API Key missing -> Using fallback summaries.")
             return
 
-        if not OPENAI_AVAILABLE:
-            logger.warning("openai package not installed. Falling back to basic summaries.")
+        if not GEMINI_AVAILABLE:
+            logger.warning("google-generativeai not installed.")
             return
 
         try:
-            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-            logger.info("OpenAI client initialized successfully")
+            genai.configure(api_key=self.gemini_api_key)
+            self.model = genai.GenerativeModel(self.model_name)
+            self.active_provider = SummaryProvider.GEMINI
+            logger.info(f"Gemini model loaded: {self.model_name}")
         except Exception as e:
-            logger.error(f"Error initializing OpenAI client: {e}")
-            self.client = None
+            logger.error(f"Gemini init failed: {e}")
+            self.model = None
+            self.active_provider = SummaryProvider.BASIC
 
-    async def generate_summaries(
-        self,
-        redacted_text: str,
-        extracted_fields: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Generate clinician and patient-friendly summaries.
-
-        Returns a dict:
-        {
-          "clinician": {"title": ..., "content": ...},
-          "patient": {"title": ..., "content": ...}
-        }
-        """
-        # Fallback basic summaries if no client
-        if not self.client:
-            logger.warning("LLM client not available, using basic fallback summaries")
-            base = redacted_text[:600] + ("..." if len(redacted_text) > 600 else "")
-            return {
-                "clinician": {
-                    "title": "Clinician Summary (Fallback)",
-                    "content": f"Raw excerpt (first 600 chars):\n\n{base}",
-                },
-                "patient": {
-                    "title": "Patient Summary (Fallback)",
-                    "content": "This is a basic fallback summary because the AI "
-                               "client is not configured properly.",
-                },
+    # ----------------------------------------------------
+    # BASIC FALLBACK SUMMARIZER
+    # ----------------------------------------------------
+    def _basic_summaries(self, text: str) -> Dict[str, Any]:
+        chunk = (text or "")[:700] + ("..." if len(text) > 700 else "")
+        return {
+            "clinician": {
+                "title": "Clinician Summary (Basic Fallback)",
+                "content": f"Excerpt:\n\n{chunk}"
+            },
+            "patient": {
+                "title": "Patient Summary (Basic Fallback)",
+                "content": f"This is a simplified summary:\n\n{chunk[:500]}"
             }
+        }
 
-        # Build a little context string from extracted_fields if available
-        fields_snippet = ""
-        if extracted_fields:
-            parts = []
-            for key, val in extracted_fields.items():
-                if isinstance(val, (dict, list)):
-                    continue
-                parts.append(f"{key.replace('_', ' ').title()}: {val}")
-            if parts:
-                fields_snippet = "\n\nKey extracted fields:\n" + "\n".join(parts)
+    # ----------------------------------------------------
+    # GEMINI RAW CALL (NO MIME TYPE)
+    # ----------------------------------------------------
+    async def _call_gemini(self, prompt: str) -> str:
+        """Safely call Gemini and return text."""
+        if not self.model:
+            raise RuntimeError("Gemini model not initialized")
 
-        prompt_common = (
-            "You are a medical assistant helping summarize a medical report.\n\n"
-            "Here is the PHI-redacted text of the report:\n"
-            "--------------------\n"
-            f"{redacted_text}\n"
-            "--------------------\n"
-            f"{fields_snippet}\n\n"
-        )
+        def _sync():
+            resp = self.model.generate_content(prompt)
+            return resp.text
 
-        # Run two prompts in sequence (clinician + patient).
-        async def _call_openai(system_msg: str, user_msg: str) -> str:
-            """Call OpenAI in a thread (client is sync)."""
-            def _sync_call():
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_msg},
-                        {"role": "user", "content": user_msg},
-                    ],
-                    temperature=0.3,
-                )
-                return completion.choices[0].message.content.strip()
+        return await asyncio.to_thread(_sync)
 
-            return await asyncio.to_thread(_sync_call)
+    # ----------------------------------------------------
+    # PARSE GEMINI JSON SAFELY
+    # ----------------------------------------------------
+    def _parse_json(self, raw: str) -> Dict[str, Any]:
+        cleaned = raw.strip()
+
+        # remove markdown fences if present
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:].strip()
 
         try:
-            clinician_system = "You are an expert clinician writing concise, technical summaries."
-            clinician_user = (
-                prompt_common
-                + "Write a concise summary (150-250 words) for clinicians. "
-                  "Focus on diagnoses, key findings, and recommended next steps. "
-                  "Use bullet points where appropriate."
-            )
-
-            patient_system = "You explain medical information to patients in simple, reassuring language."
-            patient_user = (
-                prompt_common
-                + "Write a friendly, easy-to-understand summary (120-200 words) for a patient. "
-                  "Avoid medical jargon or explain it in simple terms. "
-                  "Focus on what the results mean and what they should do next."
-            )
-
-            clinician_summary, patient_summary = await asyncio.gather(
-                _call_openai(clinician_system, clinician_user),
-                _call_openai(patient_system, patient_user),
-            )
-
+            data = json.loads(cleaned)
+        except Exception:
+            logger.warning("Gemini did not return proper JSON.")
             return {
                 "clinician": {
                     "title": "Clinician Summary",
-                    "content": clinician_summary,
+                    "content": raw
                 },
                 "patient": {
-                    "title": "Patient-Friendly Summary",
-                    "content": patient_summary,
-                },
-            }
-        except Exception as e:
-            logger.error(f"Error generating summaries with LLM: {e}")
-            # Fallback if LLM call fails
-            base = redacted_text[:600] + ("..." if len(redacted_text) > 600 else "")
-            return {
-                "clinician": {
-                    "title": "Clinician Summary (LLM Error Fallback)",
-                    "content": f"Raw excerpt (first 600 chars):\n\n{base}",
-                },
-                "patient": {
-                    "title": "Patient Summary (LLM Error Fallback)",
-                    "content": "We could not generate an AI summary due to an error. "
-                               "Please try again later.",
+                    "title": "Patient Summary",
+                    "content": raw[:600]
                 },
             }
 
-    async def compare_summaries(
-        self,
-        original_text: str,
-        clinician_summary: str,
-        patient_summary: str,
-    ) -> Dict[str, Any]:
-        """
-        Used by /api/summarize/report/{id}/compare to compare clinician vs patient summaries.
-        """
-        if not self.client:
+        return {
+            "clinician": {
+                "title": data.get("clinician", {}).get("title", "Clinician Summary"),
+                "content": data.get("clinician", {}).get("content", "")
+            },
+            "patient": {
+                "title": data.get("patient", {}).get("title", "Patient Summary"),
+                "content": data.get("patient", {}).get("content", "")
+            }
+        }
+
+    # ----------------------------------------------------
+    # PUBLIC: GENERATE SUMMARIES
+    # ----------------------------------------------------
+    # ----------------------------------------------------
+    # PUBLIC: GENERATE SUMMARIES
+    # ----------------------------------------------------
+    async def generate_summaries(self, redacted_text: str, extracted_fields=None):
+        if not redacted_text:
+            return self._basic_summaries("")
+
+        # Build snippet from extracted_fields (if any)
+        field_text = ""
+        if extracted_fields:
+            for k, v in extracted_fields.items():
+                if isinstance(v, (dict, list)):
+                    continue
+                field_text += f"{k.replace('_', ' ').title()}: {v}\n"
+
+        # ✨ RICH, STRUCTURED PROMPT
+        prompt = f"""
+You are an expert medical summarization assistant.
+
+You will read a PHI-redacted medical report and return ONLY valid JSON
+in exactly this format:
+
+{{
+  "clinician": {{"title": "", "content": ""}},
+  "patient":   {{"title": "", "content": ""}}
+}}
+
+GENERAL RULES
+- Use ONLY information clearly present in the report text.
+- NEVER invent new diagnoses, numbers, or lab values.
+- Do NOT include any names or identifiers (they have been redacted).
+- Write clearly in English.
+- Do not mention that you are an AI model.
+
+CLINICIAN SUMMARY REQUIREMENTS
+- Audience: doctor / specialist.
+- Length: about 180–260 words.
+- Tone: technical but readable.
+- Structure the BODY text with headings in ALL CAPS, for example:
+  PATIENT INFORMATION
+  KEY FINDINGS
+  IMPRESSION / DIFFERENTIAL DIAGNOSIS
+  RECOMMENDATIONS / NEXT STEPS
+- Under KEY FINDINGS and RECOMMENDATIONS, prefer short bullet points.
+- Focus on: key imaging/lab findings, relevant history, and clear plan.
+
+PATIENT SUMMARY REQUIREMENTS
+- Audience: patient with no medical background.
+- Length: about 160–230 words.
+- Tone: calm, friendly, and reassuring.
+- Avoid jargon, or briefly explain it in brackets if needed.
+- Structure the BODY text in 3 parts:
+  1) A short overview of what the test/report looked at.
+  2) A section titled "What this means" with 3–6 bullet points explaining
+     the main ideas in simple language.
+  3) A section titled "Next steps" with 3–6 bullet points describing what
+     usually happens next (follow-up tests, doctor visit, lifestyle advice),
+     but ONLY if supported by the report.
+- END with 2–3 sentences of warm reassurance, acknowledging that the
+  situation can feel worrying, and encouraging the patient to work with
+  their healthcare team (without giving absolute guarantees).
+
+Return ONLY the JSON object described above, with no extra text.
+
+PHI-redacted medical report:
+--------------------
+{redacted_text}
+--------------------
+
+Extracted structured fields (may be empty):
+{field_text}
+"""
+
+        # Try Gemini first
+        if self.model and self.active_provider == SummaryProvider.GEMINI:
+            try:
+                raw = await self._call_gemini(prompt)
+                parsed = self._parse_json(raw)
+                # keep provider metadata
+                self.active_provider = SummaryProvider.GEMINI
+                return parsed
+            except Exception as e:
+                logger.error(f"Gemini error => fallback. {e}")
+
+        # Fallback if Gemini missing / error
+        self.active_provider = SummaryProvider.BASIC
+        return self._basic_summaries(redacted_text)
+        if not redacted_text:
+            return self._basic_summaries("")
+
+        # Build prompt
+        field_text = ""
+        if extracted_fields:
+            for k, v in extracted_fields.items():
+                if isinstance(v, (dict, list)): continue
+                field_text += f"{k}: {v}\n"
+
+        prompt = f"""
+You are an expert medical report summarization AI.
+
+Return ONLY valid JSON in this format:
+
+{{
+  "clinician": {{"title": "", "content": ""}},
+  "patient":   {{"title": "", "content": ""}}
+}}
+
+Clinician summary: 150-250 words, technical.
+Patient summary: 100-200 words, simple, friendly.
+
+PHI-redacted medical report:
+--------------------
+{redacted_text}
+--------------------
+
+Extracted fields:
+{field_text}
+"""
+
+        # Try Gemini
+        if self.model and self.active_provider == SummaryProvider.GEMINI:
+            try:
+                raw = await self._call_gemini(prompt)
+                parsed = self._parse_json(raw)
+                return parsed
+            except Exception as e:
+                logger.error(f"Gemini error => fallback. {e}")
+
+        # Fallback
+        return self._basic_summaries(redacted_text)
+
+    # ----------------------------------------------------
+    # PUBLIC: COMPARE SUMMARIES
+    # ----------------------------------------------------
+    async def compare_summaries(self, original, clinician, patient):
+        if not self.model:
             return {
                 "comparison_analysis": {
-                    "note": "LLM not configured. Comparison not available."
+                    "text": "Gemini not available for comparison."
                 },
-                "recommendations": [],
+                "recommendations": []
             }
 
-        system_msg = (
-            "You are a medical communication expert comparing two summaries "
-            "of the same medical report."
-        )
-        user_msg = (
-            "Original redacted report text:\n"
-            "-----------------\n"
-            f"{original_text}\n"
-            "-----------------\n\n"
-            "Clinician-oriented summary:\n"
-            "-----------------\n"
-            f"{clinician_summary}\n"
-            "-----------------\n\n"
-            "Patient-oriented summary:\n"
-            "-----------------\n"
-            f"{patient_summary}\n"
-            "-----------------\n\n"
-            "1. Briefly compare the focus, tone, and level of detail of both summaries.\n"
-            "2. Suggest 3 improvements to each.\n"
-            "3. Highlight any important clinical detail that is missing from either."
-        )
+        prompt = f"""
+Compare two summaries of this medical report.
 
-        def _sync_call():
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_msg},
-                    {"role": "user", "content": user_msg},
-                ],
-                temperature=0.4,
-            )
-            return completion.choices[0].message.content.strip()
+Original report:
+{original}
 
-        try:
-            text = await asyncio.to_thread(_sync_call)
-            return {"comparison_analysis": {"text": text}, "recommendations": []}
-        except Exception as e:
-            logger.error(f"Error comparing summaries: {e}")
-            return {
-                "comparison_analysis": {
-                    "text": "Error while comparing summaries."
-                },
-                "recommendations": [],
-            }
+Clinician summary:
+{clinician}
+
+Patient summary:
+{patient}
+
+Provide:
+1) Differences in tone/detail
+2) 3 improvements each
+3) Missing clinical details
+"""
+
+        raw = await self._call_gemini(prompt)
+        return {
+            "comparison_analysis": {"text": raw},
+            "recommendations": []
+        }
 
 
-# Singleton instance
+# Singleton
 llm_service = LLMService()

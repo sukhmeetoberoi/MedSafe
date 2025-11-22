@@ -1,4 +1,5 @@
-import React from 'react';
+// src/App.jsx
+import React, { useState } from 'react';
 import Header from './components/layout/Header';
 import Hero from './components/sections/Hero';
 import About from './components/sections/About';
@@ -11,17 +12,25 @@ import Contact from './components/sections/Contact';
 import Footer from './components/layout/Footer';
 
 function App() {
+  // Shared reportId for Hero + Demo
+  const [reportId, setReportId] = useState(null);
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
       <main>
-        <Hero />
+        {/* Hero uploads and calls setReportId when done */}
+        <Hero onReportProcessed={setReportId} />
+
         <About />
         <Features />
         <HowItWorks />
         <TechStack />
         <WhyChoose />
-        <Demo />
+
+        {/* Demo uses same reportId and can also upload */}
+        <Demo reportId={reportId} onReportProcessed={setReportId} />
+
         <Contact />
       </main>
       <Footer />

@@ -9,7 +9,7 @@ const Hero = () => {
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(null);
 
-  // NEW: report + summary state
+  // report + summary state
   const [reportId, setReportId] = useState(null);
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -49,13 +49,16 @@ const Hero = () => {
     uploadFile(file);
   };
 
-  // NEW: fetch summary for a given report
+  // Fetch clinician summary for a given report
   const fetchSummary = async (id) => {
     try {
       setSummaryLoading(true);
       setSummary(null);
 
-      const res = await fetch(`${API_BASE}/api/summarize/report/${id}`);
+      // ask specifically for clinician summary
+      const res = await fetch(
+        `${API_BASE}/api/summarize/report/${id}?summary_type=clinician`
+      );
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -63,8 +66,8 @@ const Hero = () => {
       }
 
       const data = await res.json().catch(() => null);
-      const first = data?.summaries?.[0] || null;
-      setSummary(first);
+      const s = data?.summary || null; // backend returns { success, report_id, summary }
+      setSummary(s);
     } catch (err) {
       console.error("Summary fetch error:", err);
     } finally {
@@ -101,7 +104,7 @@ const Hero = () => {
 
       if (payload?.report_id) {
         setReportId(payload.report_id);
-        // immediately try to fetch summary (demo summary is created on upload)
+        // immediately try to fetch clinician summary
         fetchSummary(payload.report_id);
       }
     } catch (err) {
@@ -123,7 +126,10 @@ const Hero = () => {
   };
 
   return (
-    <section id="home" className="relative min-h-screen flex items-center gradient-bg overflow-hidden">
+    <section
+      id="home"
+      className="relative min-h-screen flex items-center gradient-bg overflow-hidden"
+    >
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -163,7 +169,8 @@ const Hero = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              AI-powered summarization for doctors and patients. Transform complex medical jargon into clear, actionable insights.
+              AI-powered summarization for doctors and patients. Transform
+              complex medical jargon into clear, actionable insights.
             </motion.p>
 
             <motion.div
@@ -190,7 +197,11 @@ const Hero = () => {
                 className="border-2 border-white text-white hover:bg-white hover:text-medical-blue transition-all duration-300 px-8 py-4 rounded-lg text-lg font-semibold"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
+                onClick={() =>
+                  document
+                    .getElementById("demo")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
               >
                 Watch Demo
               </motion.button>
@@ -226,14 +237,16 @@ const Hero = () => {
               )}
 
               {uploadSuccess && (
-                <div className="mt-2 text-sm text-green-400">{uploadSuccess}</div>
+                <div className="mt-2 text-sm text-green-400">
+                  {uploadSuccess}
+                </div>
               )}
               {uploadError && (
                 <div className="mt-2 text-sm text-rose-400">{uploadError}</div>
               )}
             </div>
 
-            {/* NEW: Summary Section */}
+            {/* Summary Section */}
             <div className="mt-4 bg-white/5 p-4 rounded-lg border border-white/10">
               <h3 className="text-white font-semibold mb-2">Report Summary</h3>
 
