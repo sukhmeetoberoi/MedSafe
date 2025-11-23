@@ -79,12 +79,20 @@ class PHIRedactionService:
                 "regex": r"\b(?:MR|MED|MEDICAL\s*RECORD|#)\s*[:#]?\s*\d{6,10}\b",
                 "score": 0.8,
             },
-            # Patient IDs
-            {
-                "name": "PATIENT_ID",
-                "regex": r"\b(?:PATIENT\s*ID|PID|ID)\s*[:#]?\s*[A-Z]{0,4}-?\d{4,8}\b",
-                "score": 0.9,
-            },
+# Patient IDs like "ID: SATPRIET 128", "PATIENT ID: AB1234"
+{
+    "name": "PATIENT_ID",
+    "regex": r"\b(?:PATIENT\s*ID|PID|ID)\s*[:#]?\s*[A-Z0-9]{2,12}[-\s]?\d{1,6}\b",
+    "score": 0.9,
+},
+
+# Case / MRN style IDs: "Case No: R-55220", "UHID: XYS123 77"
+{
+    "name": "PATIENT_CASE_ID",
+    "regex": r"\b(?:CASE\s*NO\.?|CASE|UHID|MRN)\s*[:#]?\s*[A-Z0-9]{2,12}[-\s]?\d{1,6}\b",
+    "score": 0.9,
+},
+
             # SSN variations
             {
                 "name": "SOCIAL_SECURITY_NUMBER",
@@ -177,8 +185,10 @@ class PHIRedactionService:
                     entities=[
                         "PERSON", "LOCATION", "DATE_TIME", "PHONE_NUMBER",
                         "EMAIL_ADDRESS", "IP_ADDRESS", "URL", "NRP",
-                        "MEDICAL_RECORD_NUMBER", "PATIENT_ID"
-                    ],
+                        "MEDICAL_RECORD_NUMBER", "PATIENT_ID",
+                        "PATIENT_CASE_ID",  # 👈 add this
+],
+
                     language="en",
                     add_patterns=patterns if patterns else None
                 )
