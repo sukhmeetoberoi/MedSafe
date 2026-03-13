@@ -24,12 +24,13 @@ function App() {
 
         <About />
         <Features />
+        <Demo reportId={reportId} onReportProcessed={setReportId} />
         <HowItWorks />
         <TechStack />
         <WhyChoose />
 
         {/* Demo uses same reportId and can also upload */}
-        <Demo reportId={reportId} onReportProcessed={setReportId} />
+        
 
         <Contact />
       </main>

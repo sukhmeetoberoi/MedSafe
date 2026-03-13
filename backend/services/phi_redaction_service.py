@@ -187,7 +187,7 @@ class PHIRedactionService:
                         "EMAIL_ADDRESS", "IP_ADDRESS", "URL", "NRP",
                         "MEDICAL_RECORD_NUMBER", "PATIENT_ID",
                         "PATIENT_CASE_ID",  # 👈 add this
-],
+                        ],
 
                     language="en",
                     add_patterns=patterns if patterns else None
