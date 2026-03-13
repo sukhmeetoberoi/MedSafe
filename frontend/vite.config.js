@@ -10,7 +10,7 @@ export default defineConfig({
     open: false,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: "https://medsafe-vmwu.onrender.com",
         changeOrigin: true,
         secure: false,
       }
