@@ -1,6 +1,4 @@
-import React, { useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Upload, ArrowRight, FileText, Brain, Shield, Clock } from "lucide-react";
+import { API_BASE } from "../../apiConfig";
 
 const Hero = ({ onReportsProcessed }) => {
   const fileInputRef = useRef(null);
@@ -14,7 +12,6 @@ const Hero = ({ onReportsProcessed }) => {
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
   const features = [
     {
