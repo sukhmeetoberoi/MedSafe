@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Users, Shield, Award, TrendingUp, CheckCircle } from 'lucide-react';
-
 const WhyChoose = () => {
   const benefits = [
     {
@@ -164,11 +163,10 @@ const WhyChoose = () => {
             {comparisonData.map((method, index) => (
               <motion.div
                 key={method.feature}
-                className={`relative overflow-hidden rounded-2xl p-8 ${
-                  method.feature === 'MedSummarize'
-                    ? 'bg-gradient-to-br from-medical-blue to-teal-accent text-white'
-                    : 'bg-white border-2 border-gray-200'
-                }`}
+                className={`relative overflow-hidden rounded-2xl p-8 ${method.feature === 'MedSummarize'
+                  ? 'bg-gradient-to-br from-medical-blue to-teal-accent text-white'
+                  : 'bg-white border-2 border-gray-200'
+                  }`}
                 initial={{ opacity: 0, x: index === 0 ? -50 : 50 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.1 * index }}
@@ -181,9 +179,8 @@ const WhyChoose = () => {
                   </div>
                 )}
 
-                <h4 className={`text-2xl font-bold mb-6 ${
-                  method.feature === 'MedSummarize' ? 'text-white' : 'text-dark-blue-gray'
-                }`}>
+                <h4 className={`text-2xl font-bold mb-6 ${method.feature === 'MedSummarize' ? 'text-white' : 'text-dark-blue-gray'
+                  }`}>
                   {method.feature}
                 </h4>
 
@@ -194,14 +191,12 @@ const WhyChoose = () => {
                     { label: 'Cost per Report', value: method.cost }
                   ].map((item) => (
                     <div key={item.label} className="flex justify-between items-center">
-                      <span className={`${
-                        method.feature === 'MedSummarize' ? 'text-blue-100' : 'text-gray-600'
-                      }`}>
+                      <span className={`${method.feature === 'MedSummarize' ? 'text-blue-100' : 'text-gray-600'
+                        }`}>
                         {item.label}
                       </span>
-                      <span className={`font-bold ${
-                        method.feature === 'MedSummarize' ? 'text-white' : 'text-dark-blue-gray'
-                      }`}>
+                      <span className={`font-bold ${method.feature === 'MedSummarize' ? 'text-white' : 'text-dark-blue-gray'
+                        }`}>
                         {item.value}
                       </span>
                     </div>
