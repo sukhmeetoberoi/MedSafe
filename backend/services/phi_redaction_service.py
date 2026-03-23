@@ -135,12 +135,7 @@ class PHIRedactionService:
                 "regex": r"\b(?:ACCT|ACCOUNT)\s*[:#]?\s*\d{6,12}\b",
                 "score": 0.8,
             },
-            # Dates (DOB)
-            {
-                "name": "BIRTH_DATE",
-                "regex": r"\b(?:DOB|Date\s*of\s*Birth|Birth\s*Date)\s*[:#]?\s*\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
-                "score": 0.9,
-            },
+            # Note: BIRTH_DATE intentionally excluded to preserve DOB
         ]
 
     async def detect_phi(self, text: str) -> List[Dict[str, Any]]:
@@ -183,10 +178,10 @@ class PHIRedactionService:
                 return self.analyzer.analyze(
                     text=text,
                     entities=[
-                        "PERSON", "LOCATION", "DATE_TIME", "PHONE_NUMBER",
+                        "PERSON", "LOCATION", "PHONE_NUMBER",
                         "EMAIL_ADDRESS", "IP_ADDRESS", "URL", "NRP",
                         "MEDICAL_RECORD_NUMBER", "PATIENT_ID",
-                        "PATIENT_CASE_ID",  # 👈 add this
+                        "PATIENT_CASE_ID",
                         ],
 
                     language="en",
@@ -338,6 +333,32 @@ class PHIRedactionService:
                 "phi_summary": "Error during redaction",
                 "redaction_stats": {"error": str(e)}
             }
+
+    async def redact_pages(self, pages: List[Dict[str, Any]], redaction_char: str = "[REDACTED]") -> List[Dict[str, Any]]:
+        """
+        Redact PHI from multiple pages while preserving page structure
+        
+        Args:
+            pages: List of dicts with 'page_number' and 'text'
+            redaction_char: Character/string to use for redaction
+            
+        Returns:
+            List of redacted pages with redaction metadata
+        """
+        redacted_pages = []
+        for page in pages:
+            text = page.get("text", "")
+            redacted_result = await self.redact_phi(text, redaction_char)
+            
+            redacted_pages.append({
+                "page_number": page.get("page_number", 1),
+                "original_text": text,
+                "redacted_text": redacted_result["redacted_text"],
+                "phi_entities": redacted_result["phi_entities"],
+                "phi_summary": redacted_result["phi_summary"]
+            })
+            
+        return redacted_pages
 
     def _generate_phi_summary(self, phi_entities: List[Dict[str, Any]]) -> str:
         """Generate summary of detected PHI"""

@@ -70,6 +70,7 @@ class OCRService:
                 pages_metadata.append(
                     {
                         "page_number": page_num + 1,
+                        "text": text,
                         "text_length": len(text),
                         "has_text": bool(text.strip()),
                     }
@@ -102,6 +103,7 @@ class OCRService:
                 "pages_metadata": [
                     {
                         "page_number": 1,
+                        "text": text,
                         "text_length": len(text),
                         "has_text": bool(text.strip()),
                     }

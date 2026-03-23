@@ -15,6 +15,7 @@ from fastapi import (
     Form,
     BackgroundTasks,
 )
+from typing import List
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -110,6 +111,81 @@ async def upload_medical_report(
         raise HTTPException(
             status_code=500, detail="Internal server error during file upload"
         )
+
+
+@router.post("/reports")
+async def upload_multiple_reports(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    user_id: Optional[int] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload multiple medical reports for processing
+    """
+    try:
+        report_ids = []
+        for file in files:
+            # Validate file
+            await _validate_upload_file(file)
+
+            # Save file to disk
+            file_info = await file_service.save_uploaded_file(file)
+
+            # Create database record
+            report = Report(
+                user_id=user_id,
+                filename=file_info["filename"],
+                original_filename=file.filename,
+                file_path=file_info["file_path"],
+                file_size=file_info["file_size"],
+                file_type=file_info["file_type"],
+                status=ProcessingStatus.UPLOADED.value
+                if isinstance(ProcessingStatus.UPLOADED, str)
+                else ProcessingStatus.UPLOADED,
+            )
+
+            db.add(report)
+            db.commit()
+            db.refresh(report)
+
+            # TEMP: create a simple demo summary
+            demo_summary = Summary(
+                report_id=report.id,
+                summary_type=SummaryType.PATIENT.value,
+                provider=SummaryProvider.BASIC.value,
+                title="Quick Overview",
+                content=(
+                    f"This is a demo summary for '{report.original_filename}'. "
+                    "Later, your real AI pipeline will generate this summary."
+                ),
+            )
+            db.add(demo_summary)
+            db.commit()
+
+            # Initiate processing pipeline as a background task
+            background_tasks.add_task(
+                processing_service.process_report_pipeline,
+                report.id,
+            )
+            
+            report_ids.append(report.id)
+            logger.info(f"Successfully uploaded batch report: {report.id} ({file.filename})")
+
+        return {
+            "success": True,
+            "report_ids": report_ids,
+            "message": f"{len(files)} files uploaded successfully. Processing will begin shortly.",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading multiple files: {e}")
+        raise HTTPException(
+            status_code=500, detail="Internal server error during batch file upload"
+        )
+
 
 
 @router.get("/status/{report_id}")

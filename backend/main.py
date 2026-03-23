@@ -10,7 +10,7 @@ import uvicorn
 import os
 
 from core.config import settings
-from api.routes import upload, process, summarize, health
+from api.routes import upload, process, summarize, health, chat
 from core.logging import setup_logging
 from database.database import init_db
 
@@ -34,8 +34,8 @@ app = FastAPI(
 base_origins = list(getattr(settings, "ALLOWED_ORIGINS", []))
 
 # Add your deployed frontend URL(s) here
-vercel_origin = "https://med-safe-seven.vercel.app/"  # 🔁 change this
-if vercel_origin not in base_origins:
+vercel_origin = os.getenv("FRONTEND_URL", "https://med-safe-seven.vercel.app") 
+if vercel_origin and vercel_origin not in base_origins:
     base_origins.append(vercel_origin)
 
 # In DEBUG mode you can optionally allow all origins
@@ -59,6 +59,7 @@ app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(process.router, prefix="/api/process", tags=["process"])
 app.include_router(summarize.router, prefix="/api/summarize", tags=["summarize"])
 app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 # Mount static files for processed reports
 if os.path.exists("static"):

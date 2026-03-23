@@ -71,6 +71,7 @@ class Report(Base):
     # PHI redaction
     phi_entities = Column(JSON, nullable=True)
     phi_redacted_text = Column(Text, nullable=True)
+    phi_redacted_pages = Column(JSON, nullable=True)  # New: stores list of redacted pages
     phi_report = Column(JSON, nullable=True)
 
     # Timestamps
@@ -107,6 +108,9 @@ class Report(Base):
             "phi_entities": self.phi_entities,
             "phi_redacted_text_length": len(self.phi_redacted_text)
             if self.phi_redacted_text
+            else 0,
+            "phi_redacted_pages_count": len(self.phi_redacted_pages)
+            if self.phi_redacted_pages
             else 0,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

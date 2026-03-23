@@ -81,6 +81,19 @@ class ProcessingService:
             report.phi_entities = phi_result["phi_entities"]
             report.phi_redacted_text = phi_result["redacted_text"]
 
+            # Step 2b: Redact individual pages for citations
+            if report.ocr_metadata and "pages_metadata" in report.ocr_metadata:
+                redacted_pages = await phi_redaction_service.redact_pages(
+                    report.ocr_metadata["pages_metadata"]
+                )
+                report.phi_redacted_pages = redacted_pages
+            else:
+                # Fallback if pages_metadata is missing
+                report.phi_redacted_pages = [{
+                    "page_number": 1,
+                    "redacted_text": report.phi_redacted_text
+                }]
+
             # PHI report
             phi_report = await phi_redaction_service.create_phi_report(
                 report.extracted_text,

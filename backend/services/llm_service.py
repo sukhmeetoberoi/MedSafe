@@ -5,7 +5,7 @@ Gemini primary, fallback summarizer secondary.
 
 import asyncio
 import json
-from typing import Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 
 from core.config import settings
 from core.logging import logger
@@ -250,6 +250,67 @@ Extracted fields:
 
         # Fallback
         return self._basic_summaries(redacted_text)
+
+    # ----------------------------------------------------
+    # PUBLIC: GENERATE QA RESPONSE
+    # ----------------------------------------------------
+    async def generate_qa_response(self, context_chunks: List[Dict[str, Any]], question: str, llm_provider: str = "auto") -> Dict[str, Any]:
+        """
+        Produce a Q&A response based on provided context chunks with citations.
+        
+        context_chunks: List of { "filename": str, "page_number": int, "text": str }
+        """
+        if not context_chunks:
+            return {
+                "summary": "No medical reports found to answer the question from.",
+                "provider_used": self.active_provider,
+                "confidence": 0.0
+            }
+
+        # Format context for the prompt
+        context_text = ""
+        for i, chunk in enumerate(context_chunks):
+            context_text += f"\n--- DOCUMENT: {chunk['filename']} | PAGE: {chunk['page_number']} ---\n"
+            context_text += chunk['text'] + "\n"
+
+        prompt = f"""
+You are MedSafe AI, a professional medical assistant.
+Your task is to answer the user's question STRICTLY using the provided medical report excerpts.
+
+CONSTRAINTS:
+1. Primary Source: Use the provided medical report excerpts for patient-specific data.
+2. Medical Guidance: Provide high-quality medical answers based on WHO (World Health Organization) standards, including nutrition/dietary advice (food to eat) and recommendations for the type of specialist doctor to see (e.g., Endocrinologist, Cardiologist) based on the findings.
+3. If an answer specifically about the patient's state is not in the excerpts, say: "I'm sorry, but that specific data is not available in the provided reports, but here is general guidance based on WHO protocols..."
+4. CITATIONS: You MUST cite every claim derived from the reports using the format [Source: <filename>, Page: <number>].
+5. Do not mention PHI (names, addresses) if any somehow remained; use generic terms if needed.
+6. Tone: Professional, clear, and empathetic.
+
+CONTEXT EXCERPTS:
+{context_text}
+
+USER QUESTION:
+{question}
+
+Return ONLY the answer text with embedded citations.
+"""
+
+        if self.model and self.active_provider == SummaryProvider.GEMINI:
+            try:
+                raw = await self._call_gemini(prompt)
+                return {
+                    "summary": raw.strip(),
+                    "provider_used": SummaryProvider.GEMINI,
+                    "confidence": 0.95
+                }
+            except Exception as e:
+                logger.error(f"Gemini QA error: {e}")
+
+        # Fallback (very basic)
+        return {
+            "summary": "I'm sorry, I'm unable to process your question at the moment due to a service error.",
+            "provider_used": SummaryProvider.BASIC,
+            "confidence": 0.0
+        }
 
     # ----------------------------------------------------
     # PUBLIC: COMPARE SUMMARIES
