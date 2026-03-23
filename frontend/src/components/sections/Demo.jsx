@@ -8,8 +8,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import ChatBox from "./ChatBox";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE } from "../../apiConfig";
 
 const Demo = ({ reportIds = [], onReportsProcessed }) => {
   const [activeView, setActiveView] = useState("clinician"); // or "patient"

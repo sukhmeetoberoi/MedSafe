@@ -1,3 +1,6 @@
+import React, { useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { Upload, ArrowRight, FileText, Brain, Shield, Clock } from "lucide-react";
 import { API_BASE } from "../../apiConfig";
 
 const Hero = ({ onReportsProcessed }) => {

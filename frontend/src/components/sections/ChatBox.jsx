@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, User, Trash2, Info, ExternalLink } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE } from "../../apiConfig";
 
 const ChatBox = ({ reportIds }) => {
   const [messages, setMessages] = useState([
