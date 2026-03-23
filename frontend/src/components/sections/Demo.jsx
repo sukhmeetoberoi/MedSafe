@@ -7,27 +7,27 @@ import {
   Eye,
   ChevronRight,
 } from "lucide-react";
+import ChatBox from "./ChatBox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-const Demo = () => {
+const Demo = ({ reportIds = [], onReportsProcessed }) => {
   const [activeView, setActiveView] = useState("clinician"); // or "patient"
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
   const [error, setError] = useState("");
 
-  const [reportId, setReportId] = useState(null);
   const [clinicianSummary, setClinicianSummary] = useState(null);
   const [patientSummary, setPatientSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   // ---------- upload ----------
-  const onFileSelected = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const onFilesSelected = async (e) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
-    setSelectedFile(file);
+    setSelectedFiles(files);
     setError("");
     setUploadMessage("");
     setClinicianSummary(null);
@@ -36,9 +36,9 @@ const Demo = () => {
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append("file", file);
+      files.forEach(file => formData.append("files", file));
 
-      const res = await fetch(`${API_BASE}/api/upload/report`, {
+      const res = await fetch(`${API_BASE}/api/upload/reports`, {
         method: "POST",
         body: formData,
       });
@@ -49,11 +49,13 @@ const Demo = () => {
       }
 
       const data = await res.json();
-      setUploadMessage(data?.message || "File uploaded successfully.");
-      if (data?.report_id) {
-        setReportId(data.report_id);
-        // immediately fetch summaries
-        fetchSummaries(data.report_id);
+      setUploadMessage(data?.message || "Files uploaded successfully.");
+      if (data?.report_ids) {
+        if (onReportsProcessed) onReportsProcessed(data.report_ids);
+        // fetch summaries for the first one for display
+        if (data.report_ids.length > 0) {
+          fetchSummaries(data.report_ids[0]);
+        }
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -69,6 +71,8 @@ const Demo = () => {
 
   // ---------- fetch summaries ----------
   const fetchSummaries = async (id) => {
+    if (!id) return; // Ensure an ID is provided
+
     try {
       setSummaryLoading(true);
       setClinicianSummary(null);
@@ -105,11 +109,12 @@ const Demo = () => {
   return (
     <section id="demo" className="py-20 bg-white">
       <input
-        id="demo-file-input"
         type="file"
+        multiple
         accept=".pdf,image/*"
         className="hidden"
-        onChange={onFileSelected}
+        id="demo-file-input"
+        onChange={onFilesSelected}
       />
 
       <div className="container mx-auto px-4">
@@ -138,11 +143,16 @@ const Demo = () => {
               </button>
             </motion.div>
 
-            {selectedFile && (
-              <div className="mt-4 text-sm text-gray-700">
-                <div className="font-medium">{selectedFile.name}</div>
-                <div className="text-xs text-gray-500">
-                  {(selectedFile.size / 1024).toFixed(1)} KB
+            {selectedFiles.length > 0 && (
+              <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h4 className="font-semibold mb-2">Selected Files ({selectedFiles.length})</h4>
+                <div className="space-y-1">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center text-xs">
+                      <FileText className="w-3 h-3 mr-2 text-medical-blue" />
+                      {file.name} ({(file.size / 1024).toFixed(0)} KB)
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -159,9 +169,9 @@ const Demo = () => {
               Generated Summary
             </h2>
             <p className="text-sm text-emerald-700 mb-4">
-              {reportId
-                ? "Showing AI-generated summaries from backend"
-                : "Upload a report to generate summaries"}
+              {reportIds.length > 0
+                ? `Showing AI analysis for ${reportIds.length} report(s)`
+                : "Upload reports to generate summaries and start chat"}
             </p>
 
             {/* View toggle */}
@@ -203,15 +213,15 @@ const Demo = () => {
                   </p>
                 )}
 
-                {!summaryLoading && !reportId && (
+                {!summaryLoading && reportIds.length === 0 && (
                   <p className="text-sm text-gray-500">
-                    Upload a report to see its summaries here.
+                    Upload reports to see summaries here.
                   </p>
                 )}
 
-                {!summaryLoading && reportId && !currentSummary && (
+                {!summaryLoading && reportIds.length > 0 && !currentSummary && (
                   <p className="text-sm text-gray-500">
-                    No {activeView} summary found yet. Try again in a moment.
+                    Extracting data and generating {activeView} summary... Please wait.
                   </p>
                 )}
 
@@ -239,21 +249,30 @@ const Demo = () => {
             </AnimatePresence>
 
             {/* Extra actions */}
-            {reportId && (
+            {reportIds.length > 0 && (
               <div className="mt-4 flex space-x-3">
                 <button
                   className="btn-primary flex items-center space-x-2"
-                  onClick={() => fetchSummaries(reportId)}
+                  onClick={() => fetchSummaries(reportIds[0])}
                 >
                   <FileText className="w-4 h-4" />
-                  <span>Refresh Summary</span>
-                </button>
-                <button className="btn-secondary flex items-center space-x-2">
-                  <ChevronRight className="w-4 h-4" />
-                  <span>View Original</span>
+                  <span>Refresh Current</span>
                 </button>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Chat Section */}
+        <div className="mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-dark-blue-gray mb-4">Ask MedSafe AI</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Have specific questions about your reports? Ask our AI assistant for instant, cited answers based on your clinical data.
+            </p>
+          </div>
+          <div className="max-w-4xl mx-auto">
+            <ChatBox reportIds={reportIds} />
           </div>
         </div>
       </div>

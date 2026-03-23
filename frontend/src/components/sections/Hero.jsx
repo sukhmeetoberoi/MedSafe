@@ -2,19 +2,19 @@ import React, { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Upload, ArrowRight, FileText, Brain, Shield, Clock } from "lucide-react";
 
-const Hero = () => {
+const Hero = ({ onReportsProcessed }) => {
   const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(null);
 
   // report + summary state
-  const [reportId, setReportId] = useState(null);
+  const [reportIds, setReportIds] = useState([]);
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
   const features = [
     {
@@ -41,12 +41,12 @@ const Hero = () => {
     fileInputRef.current?.click();
   };
 
-  // Handle file selected by user
+  // Handle files selected by user
   const onFileSelected = (e) => {
-    const file = e.target.files?.[0] ?? null;
-    if (!file) return;
-    setSelectedFile(file);
-    uploadFile(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setSelectedFiles(files);
+    uploadFiles(files);
   };
 
   // Fetch clinician summary for a given report
@@ -76,16 +76,18 @@ const Hero = () => {
   };
 
   // Upload function
-  const uploadFile = async (file) => {
+  const uploadFiles = async (files) => {
     setUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      files.forEach(file => {
+        formData.append("files", file);
+      });
 
-      const url = `${API_BASE}/api/upload/report`;
+      const url = `${API_BASE}/api/upload/reports`;
       console.log("Uploading to:", url);
 
       const res = await fetch(url, {
@@ -99,13 +101,16 @@ const Hero = () => {
       }
 
       const payload = await res.json().catch(() => null);
-      setUploadSuccess(payload?.message || "File uploaded successfully");
+      setUploadSuccess(payload?.message || "Files uploaded successfully");
       console.log("Upload response:", payload);
 
-      if (payload?.report_id) {
-        setReportId(payload.report_id);
-        // immediately try to fetch clinician summary
-        fetchSummary(payload.report_id);
+      if (payload?.report_ids) {
+        setReportIds(payload.report_ids);
+        if (onReportsProcessed) onReportsProcessed(payload.report_ids);
+        // fetch summary for the first one for hero display
+        if (payload.report_ids.length > 0) {
+          fetchSummary(payload.report_ids[0]);
+        }
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -117,10 +122,11 @@ const Hero = () => {
 
   // Optional: allow user to clear selected file + summary
   const clearSelection = () => {
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setUploadError(null);
     setUploadSuccess(null);
-    setReportId(null);
+    setReportIds([]);
+    if (onReportsProcessed) onReportsProcessed([]);
     setSummary(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -134,6 +140,7 @@ const Hero = () => {
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept=".pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={onFileSelected}
@@ -188,7 +195,7 @@ const Hero = () => {
                 disabled={uploading}
               >
                 <Upload className="w-5 h-5" />
-                <span>{uploading ? "Uploading..." : "Upload Report"}</span>
+                <span>{uploading ? "Uploading..." : "Upload Reports"}</span>
                 <ArrowRight className="w-5 h-5" />
               </motion.button>
 
@@ -209,28 +216,31 @@ const Hero = () => {
 
             {/* File preview / status */}
             <div className="mb-6">
-              {selectedFile && (
-                <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/10">
-                  <div className="text-sm text-white/90">
-                    <div className="font-medium">{selectedFile.name}</div>
-                    <div className="text-xs text-blue-200">
-                      {(selectedFile.size / 1024).toFixed(1)} KB
+              {selectedFiles.length > 0 && (
+                <div className="space-y-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/10">
+                      <div className="text-sm text-white/90">
+                        <div className="font-medium">{file.name}</div>
+                        <div className="text-xs text-blue-200">
+                          {(file.size / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="ml-auto flex items-center space-x-2">
+                  ))}
+                  <div className="flex items-center space-x-2">
                     <button
-                      className="text-sm px-3 py-1 bg-white/10 rounded hover:bg-white/20"
-                      onClick={() => uploadFile(selectedFile)}
+                      className="text-sm px-4 py-2 bg-white text-medical-blue rounded hover:bg-gray-100 font-semibold"
+                      onClick={() => uploadFiles(selectedFiles)}
                       disabled={uploading}
                     >
-                      {uploading ? "Uploading..." : "Retry Upload"}
+                      {uploading ? "Uploading..." : "Start Upload"}
                     </button>
                     <button
-                      className="text-sm px-3 py-1 bg-white/10 rounded hover:bg-white/20"
+                      className="text-sm px-4 py-2 bg-white/10 text-white rounded hover:bg-white/20"
                       onClick={clearSelection}
                     >
-                      Clear
+                      Clear All
                     </button>
                   </div>
                 </div>
@@ -250,19 +260,19 @@ const Hero = () => {
             <div className="mt-4 bg-white/5 p-4 rounded-lg border border-white/10">
               <h3 className="text-white font-semibold mb-2">Report Summary</h3>
 
-              {!reportId && (
+              {reportIds.length === 0 && (
                 <p className="text-sm text-blue-200">
-                  Upload a report to see its summary here.
+                  Upload reports to see summaries here.
                 </p>
               )}
 
-              {reportId && summaryLoading && (
+              {reportIds.length > 0 && summaryLoading && (
                 <p className="text-sm text-blue-200">
                   Generating / fetching summary...
                 </p>
               )}
 
-              {reportId && !summaryLoading && !summary && (
+              {reportIds.length > 0 && !summaryLoading && !summary && (
                 <p className="text-sm text-blue-200">
                   No summary available yet.
                 </p>

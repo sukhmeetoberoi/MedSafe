@@ -12,19 +12,19 @@ import Contact from './components/sections/Contact';
 import Footer from './components/layout/Footer';
 
 function App() {
-  // Shared reportId for Hero + Demo
-  const [reportId, setReportId] = useState(null);
+  // Shared reportIds for Hero + Demo
+  const [reportIds, setReportIds] = useState([]);
 
   return (
     <div className="min-h-screen bg-white">
       <Header />
       <main>
-        {/* Hero uploads and calls setReportId when done */}
-        <Hero onReportProcessed={setReportId} />
+        {/* Hero uploads and calls setReportIds when done */}
+        <Hero onReportsProcessed={setReportIds} />
 
         <About />
         <Features />
-        <Demo reportId={reportId} onReportProcessed={setReportId} />
+        <Demo reportIds={reportIds} onReportsProcessed={setReportIds} />
         <HowItWorks />
         <TechStack />
         <WhyChoose />
