@@ -75,16 +75,20 @@ const Hero = ({ onReportsProcessed }) => {
         console.log("Summary received successfully!");
         setSummary(data.summary);
         setSummaryLoading(false);
+        setUploadSuccess("Summary generated successfully!");
       } else if (attempt < MAX_ATTEMPTS) {
         // Not ready yet, poll again in 2 seconds
-        console.log("Summary not ready yet, polling again...");
+        console.log(`Summary not ready yet (${data.status}). Polling again...`);
+        setUploadSuccess(`Processing report... (${Math.round((attempt/MAX_ATTEMPTS)*100)}%)`);
         setTimeout(() => fetchSummary(id, attempt + 1), 2000);
       } else {
         console.warn("Summary polling timed out.");
+        setUploadError("Processing is taking longer than expected. Please check again in a minute.");
         setSummaryLoading(false);
       }
     } catch (err) {
       console.error("Summary fetch error:", err);
+      setUploadError(`Failed to load summary: ${err.message}`);
       setSummaryLoading(false);
     }
   };

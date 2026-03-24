@@ -139,7 +139,9 @@ class ProcessingService:
                 report.status = ProcessingStatus.SUMMARIES_COMPLETE
                 report.processing_progress = 0.9
                 db.commit()
-                logger.info(f"Summaries created for report {report_id}")
+                logger.info(f"✅ Summaries created for report {report_id}")
+            else:
+                logger.info(f"⏩ Skipping summaries for report {report_id} as include_summaries is False")
 
             # Complete processing
             report.status = ProcessingStatus.COMPLETED
