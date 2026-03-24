@@ -6,12 +6,15 @@
 // These are injected at BUILD TIME.
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-console.log("MedSafe API Base URL:", API_BASE);
+console.log("MedSafe API Base URL Configuration:");
+console.log("- Value from Environment:", import.meta.env.VITE_API_BASE_URL);
+console.log("- Resolved API_BASE:", API_BASE);
+console.log("- Current Hostname:", window.location.hostname);
 
-if (API_BASE.includes("localhost") && window.location.hostname !== "localhost") {
+if (API_BASE.includes("localhost") && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
   console.warn(
-    "⚠️ WARNING: Frontend is deployed but calling LOCALHOST! " +
-    "Make sure to set VITE_API_BASE_URL in your deployment environment variables (Vercel/Render)."
+    "🚨 CRITICAL DEPLOYMENT ISSUE: Your frontend is calling LOCALHOST instead of your Render backend! " +
+    "Check your Vercel/Render Environment Variables Settings for 'VITE_API_BASE_URL'."
   );
 }
 
