@@ -105,7 +105,7 @@ MedSafe/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-org/medsafe.git
+git clone https://github.com/sukhmeetoberoi/medsafe.git
 cd medsafe
 ```
 
@@ -254,9 +254,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Support
 
-- **Email**: contact@medsummarize.com
-- **Phone**: 1-800-MED-SUM
-- **Website**: [medsummarize.com](https://medsummarize.com)
+- **Email**: sukhmeetoberoi@gmail.com
+- **Phone**: 7027551823
 
 ## 🌟 Acknowledgments
 
