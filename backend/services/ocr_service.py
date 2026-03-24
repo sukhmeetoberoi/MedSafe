@@ -140,6 +140,24 @@ class OCRService:
             return cleaned_text
 
         except Exception as e:
+            # Check if it's a Tesseract not found error
+            if "tesseract is not installed" in str(e).lower() or "no such file or directory: 'tesseract'" in str(e).lower():
+                logger.warning("Tesseract not found. Falling back to Gemini Vision OCR...")
+                
+                # Convert PIL Image back to bytes for Gemini
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format='PNG')
+                img_bytes = img_byte_arr.getvalue()
+                
+                from services.llm_service import llm_service
+                gemini_text = await llm_service.ocr_image(img_bytes, "image/png")
+                
+                if gemini_text:
+                    logger.info("Successfully extracted text using Gemini Vision OCR")
+                    return self._clean_extracted_text(gemini_text)
+                else:
+                    logger.error("Gemini Vision OCR fallback also failed or returned empty")
+            
             logger.error(f"Error during OCR processing: {e}")
             raise
 

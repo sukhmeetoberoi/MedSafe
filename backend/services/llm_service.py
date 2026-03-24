@@ -80,6 +80,38 @@ class LLMService:
         return await asyncio.to_thread(_sync)
 
     # ----------------------------------------------------
+    # GEMINI VISION OCR
+    # ----------------------------------------------------
+    async def ocr_image(self, image_bytes: bytes, mime_type: str = "image/png") -> str:
+        """Use Gemini Vision to extract text from an image."""
+        if not self.model:
+            logger.warning("Gemini model not initialized for OCR")
+            return ""
+
+        prompt = (
+            "Extract all text from this medical report image. "
+            "Maintain the layout as much as possible. "
+            "Do not add any commentary, just the extracted text."
+        )
+
+        def _sync():
+            # Gemini expects a list of parts: [text_prompt, image_dict]
+            response = self.model.generate_content([
+                prompt,
+                {
+                    "mime_type": mime_type,
+                    "data": image_bytes
+                }
+            ])
+            return response.text
+
+        try:
+            return await asyncio.to_thread(_sync)
+        except Exception as e:
+            logger.error(f"Gemini OCR failed: {e}")
+            return ""
+
+    # ----------------------------------------------------
     # PARSE GEMINI JSON SAFELY
     # ----------------------------------------------------
     def _parse_json(self, raw: str) -> Dict[str, Any]:
