@@ -23,6 +23,16 @@ In your backend deployment settings, set these Environment Variables:
 - **Key**: `GEMINI_API_KEY`
 - **Value**: `your_api_key_here`
 
+### Render "Start Command" (IMPORTANT)
+In your Render **Settings**, make sure your "Start Command" is exactly:
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+OR, if you are running the script directly:
+```bash
+python main.py
+```
+
 ### Why?
 The backend needs to know your frontend URL to allow cross-origin requests (CORS). Without this, the browser will block requests even if the URL is correct.
 

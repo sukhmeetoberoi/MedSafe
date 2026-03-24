@@ -77,10 +77,13 @@ async def root():
 
 
 if __name__ == "__main__":
+    import os
+    # Render provides the port in the PORT environment variable
+    port = int(os.environ.get("PORT", settings.PORT))
     uvicorn.run(
         "main:app",
-        host=settings.HOST,
-        port=settings.PORT,
+        host="0.0.0.0",
+        port=port,
         reload=settings.DEBUG,
         log_level="info",
     )
