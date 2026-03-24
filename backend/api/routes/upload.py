@@ -149,20 +149,6 @@ async def upload_multiple_reports(
             db.commit()
             db.refresh(report)
 
-            # TEMP: create a simple demo summary
-            demo_summary = Summary(
-                report_id=report.id,
-                summary_type=SummaryType.PATIENT.value,
-                provider=SummaryProvider.BASIC.value,
-                title="Quick Overview",
-                content=(
-                    f"This is a demo summary for '{report.original_filename}'. "
-                    "Later, your real AI pipeline will generate this summary."
-                ),
-            )
-            db.add(demo_summary)
-            db.commit()
-
             # Initiate processing pipeline as a background task
             background_tasks.add_task(
                 processing_service.process_report_pipeline,

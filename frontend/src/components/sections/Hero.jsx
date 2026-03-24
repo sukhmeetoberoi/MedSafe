@@ -49,28 +49,42 @@ const Hero = ({ onReportsProcessed }) => {
     uploadFiles(files);
   };
 
-  // Fetch clinician summary for a given report
-  const fetchSummary = async (id) => {
+  // Fetch clinician summary for a given report (with polling)
+  const fetchSummary = async (id, attempt = 1) => {
+    const MAX_ATTEMPTS = 30; // 60 seconds total polling
+    
     try {
-      setSummaryLoading(true);
-      setSummary(null);
+      if (attempt === 1) {
+        setSummaryLoading(true);
+        setSummary(null);
+      }
 
-      // ask specifically for clinician summary
+      console.log(`Fetching summary for report ${id} (Attempt ${attempt})...`);
+      
       const res = await fetch(
         `${API_BASE}/api/summarize/report/${id}?summary_type=clinician`
       );
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Failed to fetch summary: ${res.status} ${text}`);
+        throw new Error(`Failed to fetch summary: ${res.status}`);
       }
 
-      const data = await res.json().catch(() => null);
-      const s = data?.summary || null; // backend returns { success, report_id, summary }
-      setSummary(s);
+      const data = await res.json();
+      
+      if (data.success && data.summary) {
+        console.log("Summary received successfully!");
+        setSummary(data.summary);
+        setSummaryLoading(false);
+      } else if (attempt < MAX_ATTEMPTS) {
+        // Not ready yet, poll again in 2 seconds
+        console.log("Summary not ready yet, polling again...");
+        setTimeout(() => fetchSummary(id, attempt + 1), 2000);
+      } else {
+        console.warn("Summary polling timed out.");
+        setSummaryLoading(false);
+      }
     } catch (err) {
       console.error("Summary fetch error:", err);
-    } finally {
       setSummaryLoading(false);
     }
   };
