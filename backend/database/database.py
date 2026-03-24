@@ -31,17 +31,36 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables"""
+    """Initialize database tables and run basic migrations"""
     try:
-        # Import models so SQLAlchemy registers them with this Base
-        import models.user  # noqa: F401
-        import models.report  # noqa: F401
-        import models.summary  # noqa: F401
+        # Import models so SQLAlchemy registers them
+        import models.user
+        import models.report
+        import models.summary
 
         Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
+        logger.info("Database tables verified/created successfully")
+
+        # --- MANUAL SCHEMA UPDATES (for existing SQLite files) ---
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("reports")]
+        
+        needed_columns = [
+            ("phi_redacted_text", "TEXT"),
+            ("phi_redacted_pages", "TEXT"),
+            ("phi_report", "TEXT")
+        ]
+        
+        with engine.connect() as conn:
+            for col_name, col_type in needed_columns:
+                if col_name not in columns:
+                    logger.info(f"Adding missing column '{col_name}' to 'reports' table...")
+                    conn.execute(text(f"ALTER TABLE reports ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+            
     except Exception as e:
-        logger.error(f"Error creating database tables: {e}")
+        logger.error(f"Error initializing database: {e}")
         raise
 
 

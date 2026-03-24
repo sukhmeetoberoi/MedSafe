@@ -20,6 +20,14 @@ setup_logging()
 # Initialize database tables
 init_db()
 
+# Check for crucial AI keys on startup
+from services.llm_service import llm_service
+if not llm_service.gemini_api_key:
+    logger.error("🛑 CRITICAL: GEMINI_API_KEY IS MISSING! AI Summaries will not work.")
+    logger.info("Please set GEMINI_API_KEY in your Render environment variables.")
+else:
+    logger.info("✅ Gemini API Key detected.")
+
 app = FastAPI(
     title="MedSummarize API",
     description="AI-powered medical report summarization system",
