@@ -4,7 +4,13 @@
 
 // In Vite, environment variables starting with VITE_ are available via import.meta.env
 // These are injected at BUILD TIME.
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const envUrl = import.meta.env.VITE_API_BASE_URL;
+const isProduction = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
+
+// Hardcoded production URL as a final fallback for your Render backend
+const PRODUCTION_URL = "https://medsafe-vmwu.onrender.com";
+
+export const API_BASE = envUrl || (isProduction ? PRODUCTION_URL : "http://localhost:8000");
 
 console.log("MedSafe API Base URL Configuration:");
 console.log("- Value from Environment:", import.meta.env.VITE_API_BASE_URL);
