@@ -11,7 +11,7 @@ import os
 
 from core.config import settings
 from api.routes import upload, process, summarize, health, chat
-from core.logging import setup_logging
+from core.logging import setup_logging, logger
 from database.database import init_db
 
 # Setup logging
